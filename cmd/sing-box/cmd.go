@@ -7,11 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/experimental/deprecated"
 	"github.com/sagernet/sing-box/include"
 	"github.com/sagernet/sing-box/log"
-	"github.com/sagernet/sing-box/protocol/group"
 	"github.com/sagernet/sing/service"
 	"github.com/sagernet/sing/service/filemanager"
 
@@ -41,7 +39,6 @@ func init() {
 }
 
 func preRun(cmd *cobra.Command, args []string) {
-	log.Debug("preRun")
 	globalCtx = context.Background()
 	sudoUser := os.Getenv("SUDO_USER")
 	sudoUID, _ := strconv.Atoi(os.Getenv("SUDO_UID"))
@@ -73,22 +70,4 @@ func preRun(cmd *cobra.Command, args []string) {
 		configPaths = append(configPaths, "config.json")
 	}
 	globalCtx = include.Context(service.ContextWith(globalCtx, deprecated.NewStderrManager(log.StdLogger())))
-}
-
-func postRun(cmd *cobra.Command, args []string) {
-	log.Debug("postRun")
-	globalCtx = context.Background()
-	finalOutbound, exist :=  service.FromContext[adapter.OutboundManager](context.Background()).Outbound("selector")
-	if !exist {
-		log.Fatal("final outbound %s not exist", "selector")
-	}
-	finalSelector, ok := finalOutbound.(*group.Selector)
-	if !ok {
-		log.Fatal("final outbound is not a selector")
-	}
-
-	if !finalSelector.SelectOutbound("") {
-		log.Fatal("final outbound selector select failed")
-	}
-	log.Debug("postRun end")
 }

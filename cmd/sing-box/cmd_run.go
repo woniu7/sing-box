@@ -11,14 +11,18 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	json0 "encoding/json"
 
-	"github.com/sagernet/sing-box"
+	box "github.com/sagernet/sing-box"
+	"github.com/sagernet/sing-box/adapter"
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing-box/protocol/group"
 	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/json"
 	"github.com/sagernet/sing/common/json/badjson"
+	"github.com/sagernet/sing/service"
 
 	"github.com/spf13/cobra"
 )
@@ -157,6 +161,7 @@ func create() (*box.Box, context.CancelFunc, error) {
 			closeMonitor(startCtx)
 		}
 	}()
+
 	err = instance.Start()
 	finishStart()
 	if err != nil {
@@ -175,6 +180,10 @@ func run() error {
 		if err != nil {
 			return err
 		}
+		if defaultSelectTag != "" {
+			selectNode(defaultSelectTag)
+		}
+
 		runtimeDebug.FreeOSMemory()
 		for {
 			osSignal := <-osSignals
@@ -209,4 +218,29 @@ func closeMonitor(ctx context.Context) {
 	default:
 	}
 	log.Fatal("sing-box did not close!")
+}
+
+func selectNode(tag string) {
+	outboundManager :=  service.FromContext[adapter.OutboundManager](globalCtx)
+	if outboundManager == nil {
+		return
+	}
+	//finalOutbound, exist := outboundManager.Outbound("selector")
+	//if !exist {
+	//	log.Fatal("final outbound %s not exist", "selector")
+	//}
+	finalOutbound := outboundManager.Default()
+	log.Debug("TagName:", finalOutbound.Tag())
+	finalSelector, ok := finalOutbound.(*group.Selector)
+	if !ok {
+		log.Fatal("final outbound is not a selector")
+	}
+
+	if !finalSelector.SelectOutbound(tag) {
+		if group, isGroup := finalOutbound.(adapter.OutboundGroup); isGroup {
+			nodes, _ := json0.MarshalIndent(group.All(), "", "  ")
+			log.Info(string(nodes))
+		}
+		log.Fatal("final outbound selector select failed")
+	}
 }
