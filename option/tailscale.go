@@ -3,9 +3,9 @@ package option
 import (
 	"net/netip"
 	"net/url"
-	"reflect"
 
 	"github.com/sagernet/sing/common/json"
+	"github.com/sagernet/sing/common/json/badjson"
 	"github.com/sagernet/sing/common/json/badoption"
 	M "github.com/sagernet/sing/common/metadata"
 )
@@ -34,6 +34,11 @@ type TailscaleEndpointOptions struct {
 type TailscaleDNSServerOptions struct {
 	Endpoint               string `json:"endpoint,omitempty"`
 	AcceptDefaultResolvers bool   `json:"accept_default_resolvers,omitempty"`
+	AcceptSearchDomain     bool   `json:"accept_search_domain,omitempty"`
+}
+
+type TailscaleCertificateProviderOptions struct {
+	Endpoint string `json:"endpoint,omitempty"`
 }
 
 type DERPServiceOptions struct {
@@ -49,9 +54,13 @@ type DERPServiceOptions struct {
 	STUN                 *DERPSTUNListenOptions                          `json:"stun,omitempty"`
 }
 
-type _DERPVerifyClientURLOptions struct {
+type _DERPVerifyClientURLBase struct {
 	URL string `json:"url,omitempty"`
-	DialerOptions
+}
+
+type _DERPVerifyClientURLOptions struct {
+	_DERPVerifyClientURLBase
+	HTTPClientOptions
 }
 
 type DERPVerifyClientURLOptions _DERPVerifyClientURLOptions
@@ -65,21 +74,32 @@ func (d DERPVerifyClientURLOptions) ServerIsDomain() bool {
 }
 
 func (d DERPVerifyClientURLOptions) MarshalJSON() ([]byte, error) {
-	if reflect.DeepEqual(d, _DERPVerifyClientURLOptions{}) {
+	if d.URL != "" && d.HTTPClientOptions.IsEmpty() {
 		return json.Marshal(d.URL)
-	} else {
-		return json.Marshal(_DERPVerifyClientURLOptions(d))
 	}
+	return badjson.MarshallObjects(d._DERPVerifyClientURLBase, HTTPClient(d.HTTPClientOptions))
 }
 
 func (d *DERPVerifyClientURLOptions) UnmarshalJSON(bytes []byte) error {
 	var stringValue string
 	err := json.Unmarshal(bytes, &stringValue)
 	if err == nil {
-		d.URL = stringValue
+		*d = DERPVerifyClientURLOptions{
+			_DERPVerifyClientURLBase: _DERPVerifyClientURLBase{URL: stringValue},
+		}
 		return nil
 	}
-	return json.Unmarshal(bytes, (*_DERPVerifyClientURLOptions)(d))
+	err = json.Unmarshal(bytes, &d._DERPVerifyClientURLBase)
+	if err != nil {
+		return err
+	}
+	var client HTTPClient
+	err = badjson.UnmarshallExcluded(bytes, &d._DERPVerifyClientURLBase, &client)
+	if err != nil {
+		return err
+	}
+	d.HTTPClientOptions = HTTPClientOptions(client)
+	return nil
 }
 
 type DERPMeshOptions struct {
