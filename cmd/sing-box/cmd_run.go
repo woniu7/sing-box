@@ -230,7 +230,7 @@ func selectNode(tag string) {
 	//	log.Fatal("final outbound %s not exist", "selector")
 	//}
 	finalOutbound := outboundManager.Default()
-	log.Debug("TagName:", finalOutbound.Tag())
+	//log.Debug("TagName:", finalOutbound.Tag())
 	finalSelector, ok := finalOutbound.(*group.Selector)
 	if !ok {
 		log.Fatal("final outbound is not a selector")
@@ -243,4 +243,5 @@ func selectNode(tag string) {
 		}
 		log.Fatal("final outbound selector select failed")
 	}
+	log.Debug("selected tag:", finalOutbound.Tag(), tag)
 }
